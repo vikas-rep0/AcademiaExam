@@ -1,0 +1,217 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile for college online examination system",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "normalizedRollNumber": { "type": "string", "maxLength": 64 },
+        "role": { "type": "string", "enum": ["admin", "student"] },
+        "classId": { "type": "string", "maxLength": 64 },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "role", "isActive"]
+    },
+    "AdminDoc": {
+      "title": "AdminDoc",
+      "description": "Marker document in admins collection verifying admin authorization",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid"]
+    },
+    "RollNumberMapping": {
+      "title": "RollNumberMapping",
+      "description": "Mapping from college roll number to student profile uid",
+      "type": "object",
+      "properties": {
+        "rollNumber": { "type": "string", "maxLength": 64 },
+        "uid": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "classId": { "type": "string", "maxLength": 64 },
+        "active": { "type": "boolean" }
+      },
+      "required": ["rollNumber", "uid", "active"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "College Examination definition with schedule and scoring policies",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "instructions": { "type": "string", "maxLength": 5000 },
+        "status": { "type": "string", "enum": ["draft", "scheduled", "published", "live", "completed", "cancelled"] },
+        "scheduledStartAt": { "type": "string", "format": "date-time" },
+        "durationSeconds": { "type": "number" },
+        "lateEntrySeconds": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "negativeMarking": { "type": "boolean" },
+        "examVersion": { "type": "number" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "tabSwitchPolicy": { "type": "string", "enum": ["strict_first_switch", "warning_once", "disabled"] }
+      },
+      "required": ["title", "status", "scheduledStartAt", "durationSeconds", "totalMarks", "createdBy"]
+    },
+    "ExamSection": {
+      "title": "ExamSection",
+      "description": "Sub-section within an examination",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 128 },
+        "order": { "type": "number" },
+        "sectionMarks": { "type": "number" },
+        "examId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["title", "order", "examId"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Question definition without revealing the answer key",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "maxLength": 128 },
+        "sectionId": { "type": "string", "maxLength": 128 },
+        "questionType": { "type": "string", "enum": ["mcq_single", "mcq_multiple", "true_false", "short_text"] },
+        "questionText": { "type": "string", "maxLength": 2000 },
+        "marks": { "type": "number" },
+        "negativeMarks": { "type": "number" },
+        "order": { "type": "number" },
+        "version": { "type": "number" }
+      },
+      "required": ["examId", "questionType", "questionText", "marks"]
+    },
+    "ExamAssignment": {
+      "title": "ExamAssignment",
+      "description": "Student enrollment assignment for a specific exam",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentRollNumber": { "type": "string", "maxLength": 64 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "classId": { "type": "string", "maxLength": 64 },
+        "eligibilityStatus": { "type": "string", "enum": ["assigned", "in_progress", "submitted", "disqualified"] }
+      },
+      "required": ["examId", "studentId", "eligibilityStatus"]
+    },
+    "Attempt": {
+      "title": "Attempt",
+      "description": "Student examination attempt record with authoritative timing",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentRollNumber": { "type": "string", "maxLength": 64 },
+        "studentName": { "type": "string", "maxLength": 128 },
+        "examVersion": { "type": "number" },
+        "status": { "type": "string", "enum": ["in_progress", "submitted", "auto_submitted_tab_switch", "auto_submitted_timeout", "disqualified"] },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "deadlineAt": { "type": "string", "format": "date-time" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "submissionReason": { "type": "string", "enum": ["manual", "tab_switch", "timeout", "admin_forced"] },
+        "finalizedAt": { "type": "string", "format": "date-time" },
+        "answerRevision": { "type": "number" },
+        "tabSwitchesCount": { "type": "number" },
+        "totalScore": { "type": "number" }
+      },
+      "required": ["examId", "studentId", "status", "startedAt", "deadlineAt"]
+    },
+    "Answer": {
+      "title": "Answer",
+      "description": "Individual question response submitted by student during attempt",
+      "type": "object",
+      "properties": {
+        "attemptId": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "questionId": { "type": "string", "maxLength": 128 },
+        "selectedOptionIds": { "type": "string", "maxLength": 256 },
+        "answerValue": { "type": "string", "maxLength": 1000 },
+        "revision": { "type": "number" },
+        "isMarkedForReview": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["attemptId", "studentId", "questionId", "revision"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and action audit trail record",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string", "maxLength": 128 },
+        "actorRole": { "type": "string", "maxLength": 32 },
+        "eventType": { "type": "string", "maxLength": 64 },
+        "examId": { "type": "string", "maxLength": 128 },
+        "attemptId": { "type": "string", "maxLength": 128 },
+        "reason": { "type": "string", "maxLength": 256 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "eventType"]
+    },
+    "AnswerKey": {
+      "title": "AnswerKey",
+      "description": "Grading answer key, strictly admin/backend readable only",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["examId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile with role and enrollment details"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminDoc" },
+      "description": "Verified admin marker documents"
+    },
+    "/rollNumberMappings/{rollNumber}": {
+      "schema": { "$ref": "#/entities/RollNumberMapping" },
+      "description": "Mapping of college roll numbers to UIDs"
+    },
+    "/exams/{examId}": {
+      "schema": { "$ref": "#/entities/Exam" },
+      "description": "Exams collection"
+    },
+    "/exams/{examId}/sections/{sectionId}": {
+      "schema": { "$ref": "#/entities/ExamSection" },
+      "description": "Sections within an exam"
+    },
+    "/exams/{examId}/questions/{questionId}": {
+      "schema": { "$ref": "#/entities/Question" },
+      "description": "Questions in exam, stripped of answer keys"
+    },
+    "/examAssignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/ExamAssignment" },
+      "description": "Student exam assignment mapping"
+    },
+    "/attempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/Attempt" },
+      "description": "Student exam attempts with authoritative deadlines"
+    },
+    "/attempts/{attemptId}/answers/{questionId}": {
+      "schema": { "$ref": "#/entities/Answer" },
+      "description": "Real-time answers recorded during an attempt"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable security log events"
+    },
+    "/answerKeys/{examId}": {
+      "schema": { "$ref": "#/entities/AnswerKey" },
+      "description": "Confidential answer keys and scoring rules"
+    }
+  }
+}

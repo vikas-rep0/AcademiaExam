@@ -1,0 +1,6 @@
+{
+  "name": "AcademiaExam - College Online Examination System",
+  "description": "Secure, high-concurrency college online examination portal with real-time proctoring, timed assessments, auto-save, and admin control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,176 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Helper Primitives
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrapAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'meenarishiswm2006@gmail.com' ||
+        (request.auth.token.email_verified == true && request.auth.token.email == 'meenarishiswm2006@gmail.com')
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isBootstrapAdmin() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Entity validation helpers
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'isActive']) &&
+             data.uid is string && data.uid.size() <= 128 &&
+             data.displayName is string && data.displayName.size() <= 128 &&
+             data.role in ['admin', 'student'] &&
+             data.isActive is bool;
+    }
+
+    function isValidAttempt(data) {
+      return data.keys().hasAll(['examId', 'studentId', 'status', 'startedAt', 'deadlineAt']) &&
+             data.examId is string && data.examId.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 128 &&
+             data.status in ['in_progress', 'submitted', 'auto_submitted_tab_switch', 'auto_submitted_timeout', 'disqualified'];
+    }
+
+    function isValidAnswer(data) {
+      return data.keys().hasAll(['attemptId', 'studentId', 'questionId', 'revision']) &&
+             data.attemptId is string && data.attemptId.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 128 &&
+             data.questionId is string && data.questionId.size() <= 128 &&
+             data.revision is number;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['actorUid', 'eventType']) &&
+             data.actorUid is string && data.actorUid.size() <= 128 &&
+             data.eventType is string && data.eventType.size() <= 64;
+    }
+
+    // 1. Admins Marker
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isBootstrapAdmin();
+    }
+
+    // 2. Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isSignedIn() && isValidUser(incoming()) && (
+        isAdmin() ||
+        (request.auth.uid == userId && incoming().uid == request.auth.uid && (
+          incoming().role == 'student' || isBootstrapAdmin()
+        ))
+      );
+      allow update: if isSignedIn() && isValidUser(incoming()) && (
+        isAdmin() ||
+        (request.auth.uid == userId && incoming().uid == existing().uid &&
+         incoming().role == existing().role &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'classId', 'normalizedRollNumber']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. Roll Number Mappings
+    match /rollNumberMappings/{rollNumber} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isSignedIn();
+    }
+
+    // 4. Exams
+    match /exams/{examId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin() || isSignedIn();
+
+      match /sections/{sectionId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin() || isSignedIn();
+      }
+
+      match /questions/{questionId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin() || isSignedIn();
+      }
+    }
+
+    // 5. Answer Keys (Strict Admin Only - Never readable by students)
+    match /answerKeys/{examId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 6. Exam Assignments
+    match /examAssignments/{assignmentId} {
+      allow get: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (isAdmin() || resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin() || isSignedIn();
+    }
+
+    // 7. Attempts
+    match /attempts/{attemptId} {
+      allow get: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (isAdmin() || resource.data.studentId == request.auth.uid);
+      allow create: if isSignedIn() && isValidAttempt(incoming()) && (
+        isAdmin() ||
+        (incoming().studentId == request.auth.uid && incoming().status == 'in_progress')
+      );
+      allow update: if isSignedIn() && isValidAttempt(incoming()) && (
+        isAdmin() ||
+        (
+          existing().studentId == request.auth.uid &&
+          existing().status == 'in_progress' &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'submittedAt', 'submissionReason', 'finalizedAt', 'tabSwitchesCount', 'answerRevision'])
+        )
+      );
+      allow delete: if isAdmin();
+
+      // Attempt Answers Sub-collection
+      match /answers/{questionId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/attempts/$(attemptId)).data.studentId == request.auth.uid ||
+          isAdmin()
+        );
+        allow create, update: if isSignedIn() && isValidAnswer(incoming()) && (
+          isAdmin() ||
+          (
+            get(/databases/$(database)/documents/attempts/$(attemptId)).data.studentId == request.auth.uid &&
+            get(/databases/$(database)/documents/attempts/$(attemptId)).data.status == 'in_progress' &&
+            request.time <= get(/databases/$(database)/documents/attempts/$(attemptId)).data.deadlineAt &&
+            incoming().studentId == request.auth.uid
+          )
+        );
+        allow delete: if isAdmin();
+      }
+    }
+
+    // 8. Audit Logs (Immutable, append-only)
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidAuditLog(incoming()) && (
+        incoming().actorUid == request.auth.uid || isAdmin()
+      );
+      allow update, delete: if false;
+    }
+  }
+}
